@@ -1,6 +1,5 @@
 FONT = {
     'font_dimens': (3, 5),
-
     '0': {
         'data': [
             1, 1, 1,

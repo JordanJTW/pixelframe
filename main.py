@@ -1,193 +1,102 @@
 from PIL import Image
-from time import localtime, sleep, strftime
+from plugin.cast_album_art import CastPlugin
+from renderer.renderer import Alignment, Renderer
+from time import localtime, strftime
 
+import argparse
 import math
 import requests
-
-from font import FONT
-
-def center_crop(image):
-    width, height = image.size
-    square = min(width, height)
-    left = (width - square) / 2
-    top = (height - square) / 2
-    right = (width + square) / 2
-    bottom = (height + square) / 2
-    return image.crop((left, top, right, bottom))
+import sys
+import threading
 
 
-ANCHOR_LEFT = 1 << 0
-ANCHOR_RIGHT = 1 << 1
-ANCHOR_TOP = 1 << 2
-ANCHOR_BOTTOM = 1 << 3
-ANCHOR_CENTER_X = 1 << 4
-ANCHOR_CENTER_Y = 1 << 5
+class PixelFrame(threading.Thread):
+    def __init__(self, renderer_sink):
+        threading.Thread.__init__(self)
+        self.daemon = True
 
+        self._condvar = threading.Condition()
+        self._shutdown = False
 
-class RendererSink:
-    def putpixel(self, position, color):
-        pass
+        self._renderer = Renderer(renderer_sink)
+        self._background = None
+        self._plugins = []
 
-    def render(self):
-        pass
+        self.start()
 
-    def size(self):
-        pass
+    def shutdown(self):
+        with self._condvar:
+            self._shutdown = True
+            self._condvar.notify()
 
+        self.join()
 
-class ImageRendererSink(RendererSink):
-    def __init__(self, size):
-        self._image = Image.new("RGB", size)
-        self._size = size
+    def add_plugin(self, plugin):
+        self._plugins.append(plugin)
+        plugin.setup_plugin(self)
 
-    def putpixel(self, position, color):
-        self._image.putpixel(position, color)
-
-    def render(self):
-        self._image.show()
-
-    def size(self):
-        return self._size
-
-
-class MatrixRendererSink(RendererSink):
-    def __init__(self, size):
-        from rgbmatrix import RGBMatrix, RGBMatrixOptions
-
-        options = RGBMatrixOptions()
-        options.rows = 32
-        options.chain_length = 1
-        options.parallel = 1
-        # If you have an Adafruit HAT: 'adafruit-hat'
-        options.hardware_mapping = 'adafruit-hat'
-
-        self._matrix = RGBMatrix(options=options)
-        self._size = size
-
-    def putpixel(self, position, color):
-        x, y = position
-        self._matrix.SetPixel(x, y, *color)
-
-    def render(self):
+    def run(self):
         while True:
-            pass
+            with self._condvar:
+                if self._shutdown:
+                    return
 
-    def size(self):
-        return self._size
+                self._condvar.wait()
 
+    def set_background(self, image):
+        self._background = image
+        self.update()
 
-class Renderer:
-    def __init__(self, sink):
-        self._window_width, self._window_height = sink.size()
-        self._buffer = [
-            (0, 0, 0) for i in range(self._window_width * self._window_height)]
-        self._sink = sink
+    def set_background_url(self, url):
+        image = Image.open(requests.get(url, stream=True).raw)
+        self.set_background(image)
 
-    def draw_image(self, image):
-        image = center_crop(image)
-        image = image.resize((self._window_width, self._window_height))
-
-        for y in range(self._window_height):
-            for x in range(self._window_width):
-                color = image.getpixel((x, y))
-                self.putpixel((x, y), color)
-
-    def draw_char(self, char, x, y, color):
-        font_width, font_height = FONT['font_dimens']
-
-        width = FONT[char].get('width', font_width)
-        width_offset = (font_width - width)
-
-        for dy in range(font_height):
-            for dx in range(font_width):
-                position = (x + dx - width_offset, y + dy)
-
-                if FONT[char]['data'][dy * font_width + dx]:
-                    self.putpixel(position, color)
-
-        return x + width
-
-    def draw_string(self, string,
-                    anchor=ANCHOR_LEFT, color=(255, 255, 255),
-                    padding=1, spacing=1):
-        font_width, font_height = FONT['font_dimens']
-
-        def calc_length():
-            length = 0
-            for char in string:
-                length += FONT[char].get('width', font_width) + spacing
-            return length
-
-        def calc_x():
-            if anchor & ANCHOR_LEFT:
-                return padding
-            if anchor & ANCHOR_RIGHT:
-                return self._window_width - calc_length() - padding + spacing
-
-            return math.ceil((self._window_width - calc_length()) / 2)
-
-        def calc_y():
-            if anchor & ANCHOR_TOP:
-                return padding
-            if anchor & ANCHOR_BOTTOM:
-                return self._window_height - font_height - padding
-
-            return math.ceil((self._window_height - font_height) / 2)
-
-        x = calc_x()
-        y = calc_y()
-
-        for char in string:
-            x = self.draw_char(char, x, y, color) + spacing
-
-    def putpixel(self, position, color):
-        x, y = position
-        if (x < 0 or x >= self._window_width) or (
-                y < 0 or y >= self._window_height):
-            raise Exception('({}, {}) is out of bounds.'.format(x, y))
-
-        index = y * self._window_width + x
-        self._buffer[index] = color
-
-    def render(self):
-        for index in range(len(self._buffer)):
-            position = (
-                index %
-                self._window_width, int(
-                    index / self._window_width))
-            self._sink.putpixel(position, self._buffer[index])
-
-        self._sink.render()
+    def update(self):
+        if self._background:
+            self._renderer.draw_image(self._background, 0.5)
+        self._renderer.draw_string(
+                strftime('%-I:%M', localtime()),
+                anchor=Alignment.ANCHOR_BOTTOM | Alignment.ANCHOR_RIGHT)
+        self._renderer.render()
 
 
-url = ("https://www.greatbarrierreefs.com.au/wp-content/uploads/"
-       "YEAH-EAT-IT-1024x678.jpg")
+url = ('https://www2.padi.com/blog/wp-content/uploads/2015/06/'
+       'manatee-crystal-river-florida-e1458927615956.jpg')
+
+
+def parse_args():
+    parser = argparse.ArgumentParser(description='PixelFrame application')
+    parser.add_argument('-s', '--sink', default='matrix', choices=['matrix', 'image', 'gui', 'dummy'],
+                    help='The type of render sink to use.')
+    parser.add_argument('-n', '--number', default=32, type=int,
+                    help='The number of pixels (squared) making up the display.')
+    return parser.parse_args()
 
 
 def main():
-    img = Image.open(requests.get(url, stream=True).raw)
+    args = parse_args()
 
-    sink = ImageRendererSink((32, 32))
-    renderer = Renderer(sink)
+    dimensions = (args.number, args.number)
 
-    while True:
-        renderer.draw_image(img)
-        renderer.draw_string(strftime('%I:%M', localtime()),
-                             color=(255, 0, 0),
-                             anchor=ANCHOR_BOTTOM | ANCHOR_RIGHT)
+    if args.sink == 'matrix':
+        from renderer.matrix_sink import MatrixSink
+        sink = MatrixSink(dimensions)
+    elif args.sink == 'image':
+        from renderer.image_sink import ImageSink
+        sink = ImageSink(dimensions)
+    elif args.sink == 'gui':
+        from renderer.tk_sink import TkSink
+        sink = TkSink(dimensions)
+    elif args.sink == 'dummy':
+        from renderer.renderer import RendererSink
+        sink = RendererSink(dimensions)
 
-    # renderer.draw_string('1:', anchor=ANCHOR_LEFT | ANCHOR_TOP)
-    # renderer.draw_string('2:', anchor=ANCHOR_LEFT)
-    # renderer.draw_string('3:', anchor=ANCHOR_LEFT | ANCHOR_BOTTOM)
-    # renderer.draw_string(':4', anchor=ANCHOR_BOTTOM)
-    # renderer.draw_string(':5', anchor=ANCHOR_RIGHT | ANCHOR_BOTTOM)
-    # renderer.draw_string(':6', anchor=ANCHOR_RIGHT)
-    # renderer.draw_string('7:', anchor=ANCHOR_RIGHT | ANCHOR_TOP)
-    # renderer.draw_string('8:', anchor=ANCHOR_TOP)
-    # renderer.draw_string('9:', anchor=ANCHOR_CENTER_X | ANCHOR_CENTER_Y)
-
-        renderer.render()
-        sleep(60)
+    instance = PixelFrame(sink)
+    instance.set_background_url(url)
+    instance.add_plugin(CastPlugin(instance))
+    
+    sink.start()
+    instance.shutdown()
 
 
 if __name__ == '__main__':

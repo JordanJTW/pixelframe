@@ -1,13 +1,40 @@
 from PIL import Image
 from plugin.cast_album_art import CastPlugin
 from renderer.renderer import Alignment, Renderer
-from time import localtime, strftime
 
 import argparse
 import math
 import requests
 import sys
 import threading
+import time
+
+
+class Tween:
+    def __init__(self, start_value, end_value, duration):
+        self._start_time = time.time()
+        self._start_value = start_value
+        self._end_value = end_value
+        self._duration = duration
+        self._current_value = start_value  
+
+    def update(self):
+        delta_value = self._end_value - self._start_value
+        delta_time = (time.time() - self._start_time)
+        percentage = delta_time / self._duration
+
+        self._current_value = (delta_value * percentage) + self._start_value
+        
+        if self._current_value > self._end_value:
+            self._current_value = self._end_value
+
+        return self._current_value
+
+    def current_value(self):
+        return self._current_value
+
+    def is_end(self):
+        return (self._current_value == self._end_value)
 
 
 class PixelFrame(threading.Thread):
@@ -22,6 +49,9 @@ class PixelFrame(threading.Thread):
         self._background = None
         self._plugins = []
 
+        self._background_tween = Tween(start_value=0.0, end_value=0.5, duration=2.0)
+
+        self._begun = False
         self.start()
 
     def shutdown(self):
@@ -41,11 +71,18 @@ class PixelFrame(threading.Thread):
                 if self._shutdown:
                     return
 
-                self._condvar.wait()
+                if not self._background_tween.is_end() and self._begun:
+                    self._background_tween.update()
+                    self.update()
+
+                if self._background_tween.is_end():
+                    self._condvar.wait(timeout=0.5)
 
     def set_background(self, image):
         self._background = image
+        self._background_tween = Tween(start_value=0.0, end_value=0.5, duration=2.0)
         self.update()
+        self._begun = True
 
     def set_background_url(self, url):
         image = Image.open(requests.get(url, stream=True).raw)
@@ -53,9 +90,9 @@ class PixelFrame(threading.Thread):
 
     def update(self):
         if self._background:
-            self._renderer.draw_image(self._background, 0.5)
+            self._renderer.draw_image(self._background, self._background_tween.current_value())
         self._renderer.draw_string(
-                strftime('%-I:%M', localtime()),
+                time.strftime('%-I:%M', time.localtime()),
                 anchor=Alignment.ANCHOR_BOTTOM | Alignment.ANCHOR_RIGHT)
         self._renderer.render()
 

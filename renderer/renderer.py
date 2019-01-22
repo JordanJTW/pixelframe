@@ -47,13 +47,13 @@ class RendererSink:
         return self._size
 
 
-class Alignment(IntEnum):
-    ANCHOR_LEFT = 1 << 0
-    ANCHOR_RIGHT = 1 << 1
-    ANCHOR_TOP = 1 << 2
-    ANCHOR_BOTTOM = 1 << 3
-    ANCHOR_CENTER_X = 1 << 4
-    ANCHOR_CENTER_Y = 1 << 5
+class Anchor(IntEnum):
+    LEFT = 1 << 0
+    RIGHT = 1 << 1
+    TOP = 1 << 2
+    BOTTOM = 1 << 3
+    CENTER_X = 1 << 4
+    CENTER_Y = 1 << 5
 
 
 class Renderer:
@@ -111,7 +111,7 @@ class Renderer:
         return x + width
 
     def draw_string(self, string,
-                    anchor=Alignment.ANCHOR_LEFT, color=None,
+                    anchor=Anchor.LEFT, color=None,
                     padding=1, spacing=1, icon=None):
         font_width, font_height = FONT['font_dimens']
         bitmap, alignment = icon if icon else (None, None)
@@ -123,18 +123,18 @@ class Renderer:
             return length - spacing
 
         def calc_x():
-            if anchor & Alignment.ANCHOR_LEFT:
+            if anchor & Anchor.LEFT:
                 return padding
-            if anchor & Alignment.ANCHOR_RIGHT:
+            if anchor & Anchor.RIGHT:
                 x = self._window_width - calc_length() - padding
                 return x if not bitmap else x - bitmap['width'] - spacing
 
             return math.ceil((self._window_width - calc_length()) / 2)
 
         def calc_y():
-            if anchor & Alignment.ANCHOR_TOP:
+            if anchor & Anchor.TOP:
                 return padding
-            if anchor & Alignment.ANCHOR_BOTTOM:
+            if anchor & Anchor.BOTTOM:
                 return self._window_height - font_height - padding
 
             return math.ceil((self._window_height - font_height) / 2)
@@ -155,14 +155,14 @@ class Renderer:
             color = tuple(int(x/total_pixels) for x in sum_color)
             color = tuple(255 if x < 128 else 0 for x in color)
 
-        if icon and alignment is Alignment.ANCHOR_LEFT:
+        if icon and alignment is Anchor.LEFT:
             self.draw_bitmap(bitmap, x, y)
             x = x + bitmap['width'] + spacing
 
         for char in string:
             x = self.draw_char(char, x, y, color) + spacing
 
-        if icon and alignment is Alignment.ANCHOR_RIGHT:
+        if icon and alignment is Anchor.RIGHT:
             self.draw_bitmap(bitmap, x, y)
 
     def putpixel(self, position, color, brightness=1.0):

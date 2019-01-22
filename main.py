@@ -2,7 +2,7 @@ from PIL import Image
 
 from asset.icon import RAIN, STORM, SUN
 from plugin.cast_album_art import CastPlugin
-from renderer.renderer import Alignment, Renderer
+from renderer.renderer import Anchor, Renderer
 
 import argparse
 import math
@@ -95,8 +95,8 @@ class PixelFrame(threading.Thread):
             self._renderer.draw_image(self._background, self._background_tween.current_value())
         self._renderer.draw_string(
                 time.strftime('%-I:%M', time.localtime()),
-                anchor=Alignment.ANCHOR_TOP | Alignment.ANCHOR_LEFT)
-        self._renderer.draw_string('75', anchor=Alignment.ANCHOR_BOTTOM | Alignment.ANCHOR_RIGHT, icon=(STORM, Alignment.ANCHOR_LEFT))
+                anchor=Anchor.TOP | Anchor.LEFT)
+        self._renderer.draw_string('75', anchor=Anchor.BOTTOM | Anchor.RIGHT, icon=(STORM, Anchor.RIGHT))
         self._renderer.render()
 
 
@@ -133,7 +133,7 @@ def main():
 
     instance = PixelFrame(sink)
     instance.set_background_url(url)
-    instance.add_plugin(CastPlugin(instance))
+    # instance.add_plugin(CastPlugin(instance))
     
     sink.start()
     instance.shutdown()

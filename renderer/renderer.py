@@ -1,5 +1,5 @@
 from asset.font import FONT
-from enum import Flag, auto
+from enum import IntEnum
 from PIL import Image
 from time import sleep
 
@@ -47,13 +47,13 @@ class RendererSink:
         return self._size
 
 
-class Alignment(Flag):
-    ANCHOR_LEFT = auto()
-    ANCHOR_RIGHT = auto()
-    ANCHOR_TOP = auto()
-    ANCHOR_BOTTOM = auto()
-    ANCHOR_CENTER_X = auto()
-    ANCHOR_CENTER_Y = auto()
+class Alignment(IntEnum):
+    ANCHOR_LEFT = 1 << 0
+    ANCHOR_RIGHT = 1 << 1
+    ANCHOR_TOP = 1 << 2
+    ANCHOR_BOTTOM = 1 << 3
+    ANCHOR_CENTER_X = 1 << 4
+    ANCHOR_CENTER_Y = 1 << 5
 
 
 class Renderer:

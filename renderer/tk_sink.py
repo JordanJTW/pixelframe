@@ -7,6 +7,7 @@ except:
 from renderer.renderer import RendererSink
 from time import sleep
 
+import queue
 import sys
 
 CELL_DIM = 7
@@ -19,6 +20,7 @@ class TkSink(RendererSink):
     RendererSink.__init__(self, size)
 
     self._buffer = [(0, 0, 0) for i in range(size[0] * size[1])]
+    self._queue = queue.Queue()
 
     width =  (size[0] * CELL_DIM) + ((size[0] - 1) * CELL_PADDING) + (WINDOW_PADDING * 2)
     height =  (size[1] * CELL_DIM) + ((size[1] - 1) * CELL_PADDING) + (WINDOW_PADDING * 2)
@@ -32,10 +34,13 @@ class TkSink(RendererSink):
     canvas.configure(background='black')
     self._canvas = canvas
 
+    self._on_render()
+
   def start(self):
     try:
       self._root.mainloop()
     except KeyboardInterrupt:
+      self._queue.put(False)
       sys.exit(0)
 
   def putpixel(self, position, color=(255, 255, 255)):
@@ -44,7 +49,20 @@ class TkSink(RendererSink):
     self._buffer[index] = color
 
   def render(self):
-    self._root.after(0, self._render)
+    self._queue.put(True)
+
+  def _on_render(self):
+    while True:
+      try:
+        v = self._queue.get(timeout=0)
+        if not v:
+          return
+
+        self._render()
+      except:
+        break
+
+    self._root.after(33, self._on_render)
 
   def _render(self):
     for index in range(len(self._buffer)):

@@ -2,3 +2,4 @@ __pycache__
 led_sim.py
 .DS_Store
 env/
+*.png

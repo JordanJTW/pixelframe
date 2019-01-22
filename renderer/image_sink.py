@@ -12,7 +12,7 @@ class ImageSink(RendererSink):
         self._image.putpixel(position, color)
 
     def render(self):
-        self._image.show()
+        self._image.save('output.png')
 
     def size(self):
         return self._size

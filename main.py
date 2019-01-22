@@ -1,4 +1,6 @@
 from PIL import Image
+
+from asset.icon import RAIN, STORM, SUN
 from plugin.cast_album_art import CastPlugin
 from renderer.renderer import Alignment, Renderer
 
@@ -93,7 +95,8 @@ class PixelFrame(threading.Thread):
             self._renderer.draw_image(self._background, self._background_tween.current_value())
         self._renderer.draw_string(
                 time.strftime('%-I:%M', time.localtime()),
-                anchor=Alignment.ANCHOR_BOTTOM | Alignment.ANCHOR_RIGHT)
+                anchor=Alignment.ANCHOR_TOP | Alignment.ANCHOR_LEFT)
+        self._renderer.draw_string('75', anchor=Alignment.ANCHOR_BOTTOM | Alignment.ANCHOR_RIGHT, icon=(STORM, Alignment.ANCHOR_LEFT))
         self._renderer.render()
 
 

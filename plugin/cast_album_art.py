@@ -2,12 +2,12 @@ import pychromecast
 
 
 class CastPlugin:
-    def __init__(self, instance):
+    def __init__(self):
         self._controller = None
         self._current_image_url = None
         self._instance = None
 
-    def setup_plugin(self, instance):
+    def setup_plugin(self, instance, renderer):
         print('Setting up CastPlugin...')
 
         self._instance = instance
@@ -40,3 +40,6 @@ class CastPlugin:
             print('Update to:', image_url)
             self._current_image_url = image_url
             self._instance.set_background_url(image_url)
+
+    def update(self):
+        pass

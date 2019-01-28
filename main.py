@@ -1,7 +1,7 @@
 from PIL import Image
 
-from asset.icon import RAIN, STORM, SUN
 from plugin.cast_album_art import CastPlugin
+from plugin.weather import WeatherPlugin
 from renderer.renderer import Anchor, Renderer
 
 import argparse
@@ -53,6 +53,7 @@ class PixelFrame(threading.Thread):
 
         self._background_tween = Tween(start_value=0.0, end_value=0.5, duration=2.0)
 
+        self._current_time = time.strftime('%-I:%M', time.localtime())
         self._begun = False
         self.start()
 
@@ -65,13 +66,18 @@ class PixelFrame(threading.Thread):
 
     def add_plugin(self, plugin):
         self._plugins.append(plugin)
-        plugin.setup_plugin(self)
+        plugin.setup_plugin(self, self._renderer)
 
     def run(self):
         while True:
             with self._condvar:
                 if self._shutdown:
                     return
+
+                new_time = time.strftime('%-I:%M', time.localtime())
+                if self._current_time != new_time:
+                    self._current_time = new_time
+                    self.update()
 
                 if not self._background_tween.is_end() and self._begun:
                     self._background_tween.update()
@@ -93,10 +99,14 @@ class PixelFrame(threading.Thread):
     def update(self):
         if self._background:
             self._renderer.draw_image(self._background, self._background_tween.current_value())
+
         self._renderer.draw_string(
                 time.strftime('%-I:%M', time.localtime()),
                 anchor=Anchor.TOP | Anchor.LEFT)
-        self._renderer.draw_string('75', anchor=Anchor.BOTTOM | Anchor.RIGHT, icon=(STORM, Anchor.RIGHT))
+
+        for plugin in self._plugins:
+            plugin.update()
+
         self._renderer.render()
 
 
@@ -133,7 +143,8 @@ def main():
 
     instance = PixelFrame(sink)
     instance.set_background_url(url)
-    # instance.add_plugin(CastPlugin(instance))
+    instance.add_plugin(CastPlugin())
+    instance.add_plugin(WeatherPlugin())
     
     sink.start()
     instance.shutdown()

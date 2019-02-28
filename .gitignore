@@ -3,3 +3,4 @@ led_sim.py
 .DS_Store
 env/
 *.png
+yahoo_client_secret.json

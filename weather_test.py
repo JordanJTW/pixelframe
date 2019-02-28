@@ -10,10 +10,6 @@ import uuid
 import urllib.parse
 import urllib.request
 
-from asset.icon import RAIN, STORM, SUN
-from renderer.renderer import Anchor
-
-
 API_URL = 'https://weather-ydn-yql.media.yahoo.com/forecastrss'
 CLIENT_SECRET_PATH = 'yahoo_client_secret.json'
 
@@ -112,25 +108,6 @@ class CachedWeatherFetcher:
       return (None, None)
 
 
-class WeatherPlugin:
-    def __init__(self):
-        self._fetcher = CachedWeatherFetcher()
-        self._renderer = None
-        self._weather = None
-
-    def setup_plugin(self, instance, renderer):
-        print('Setting up WeatherPlugin...')
-
-        self._renderer = renderer
-        self._weather = self._fetcher.fetch(94040)
-        instance.update()
-
-    def update(self):
-        current_temp = self._weather['current_observation']['wind']['chill']
-        current_temp_str = '{0:.0f}'.format(current_temp)
-
-        self._renderer.draw_string(current_temp_str,
-                                   anchor=Anchor.BOTTOM | Anchor.RIGHT,
-                                   icon=(STORM, Anchor.RIGHT))
-
-
+fetcher = CachedWeatherFetcher()
+output = json.dumps(fetcher.fetch('94040'), indent=2)
+print(output)

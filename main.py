@@ -40,14 +40,14 @@ class Tween:
 
 
 class PixelFrame(threading.Thread):
-    def __init__(self, renderer_sink):
+    def __init__(self, renderer_sink, **kwargs):
         threading.Thread.__init__(self)
         self.daemon = True
 
         self._condvar = threading.Condition()
         self._shutdown = False
 
-        self._renderer = Renderer(renderer_sink)
+        self._renderer = Renderer(renderer_sink, **kwargs)
         self._background = None
         self._plugins = []
 
@@ -120,6 +120,8 @@ def parse_args():
                     help='The type of render sink to use.')
     parser.add_argument('-n', '--number', default=32, type=int,
                     help='The number of pixels (squared) making up the display.')
+    parser.add_argument('-q', '--scale', default=1, type=int,
+                    help='The number of pixels (squared) representing a single virtual pixel.')
     return parser.parse_args()
 
 
@@ -141,7 +143,7 @@ def main():
         from renderer.renderer import RendererSink
         sink = RendererSink(dimensions)
 
-    instance = PixelFrame(sink)
+    instance = PixelFrame(sink, scale=args.scale)
     instance.set_background_url(url)
     instance.add_plugin(CastPlugin())
     instance.add_plugin(WeatherPlugin())

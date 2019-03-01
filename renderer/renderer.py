@@ -54,13 +54,15 @@ class Anchor(IntEnum):
     BOTTOM = 1 << 3
     CENTER_X = 1 << 4
     CENTER_Y = 1 << 5
+    CENTER = CENTER_X | CENTER_Y
 
 
 class Renderer:
-    def __init__(self, sink):
-        print('Renderer init(%dx%d)' % sink.size())
+    def __init__(self, sink, scale=1):
+        print('Renderer init(%dx%d) scale: %d' % (*sink.size(), scale))
         print('Renderer sink: %s' % (sink.__class__.__name__))
 
+        self._scale = scale
         self._window_width, self._window_height = sink.size()
         self._buffer = [
             (0, 0, 0) for i in range(self._window_width * self._window_height)]
@@ -84,7 +86,7 @@ class Renderer:
                     continue
           
                 color = hex_to_rgb(bitmap['pallete'][value - 1])
-                self.putpixel((x + dx, y + dy), color)
+                self.putpixel((x + self._scale * dx, y + self._scale * dy), color, self._scale)
 
     def draw_image(self, image, brightness):
         image = center_crop(image).convert("RGB")
@@ -93,51 +95,57 @@ class Renderer:
         for y in range(self._window_height):
             for x in range(self._window_width):
                 color = image.getpixel((x, y))
-                self.putpixel((x, y), color, brightness)
+                # Images should always have a scale of 1.0:
+                self.putpixel((x, y), color, brightness, scale=1)
 
-    def draw_char(self, char, x, y, color):
+    def draw_char(self, char, x, y, color, scale=None):
         font_width, font_height = FONT['font_dimens']
+        scale = scale if scale else self._scale
 
         width = FONT[char].get('width', font_width)
         width_offset = (font_width - width)
 
         for dy in range(font_height):
             for dx in range(font_width):
-                position = (x + dx - width_offset, y + dy)
+                position = (x + ((dx - width_offset) * scale), y + (dy * scale))
 
                 if FONT[char]['data'][dy * font_width + dx]:
-                    self.putpixel(position, color)
+                    self.putpixel(position, color, scale)
 
-        return x + width
+        return x + (width * scale)
 
     def draw_string(self, string,
                     anchor=Anchor.LEFT, color=None,
-                    padding=1, spacing=1, icon=None):
+                    padding=1, spacing=1, icon=None, scale=None):
         font_width, font_height = FONT['font_dimens']
         bitmap, alignment = icon if icon else (None, None)
+
+        scale = scale if scale else self._scale
+        scaled_spacing = spacing * scale
+        scaled_padding = padding * scale
 
         def calc_length():
             length = 0
             for char in string:
                 length += FONT[char].get('width', font_width) + spacing
-            return length - spacing
+            return (length - spacing) * scale
 
         def calc_x():
             if anchor & Anchor.LEFT:
-                return padding
+                return scaled_padding
             if anchor & Anchor.RIGHT:
-                x = self._window_width - calc_length() - padding
-                return x if not bitmap else x - bitmap['width'] - spacing
+                x = self._window_width - calc_length() - scaled_padding
+                return x if not bitmap else x - bitmap['width'] * scale - scaled_spacing
 
             return math.ceil((self._window_width - calc_length()) / 2)
 
         def calc_y():
             if anchor & Anchor.TOP:
-                return padding
+                return scaled_padding
             if anchor & Anchor.BOTTOM:
-                return self._window_height - font_height - padding
+                return self._window_height - font_height * scale - scaled_padding
 
-            return math.ceil((self._window_height - font_height) / 2)
+            return math.ceil((self._window_height - font_height * scale) / 2)
 
         x = calc_x()
         y = calc_y()
@@ -160,20 +168,24 @@ class Renderer:
             x = x + bitmap['width'] + spacing
 
         for char in string:
-            x = self.draw_char(char, x, y, color) + spacing
+            x = self.draw_char(char, x, y, color, scale) + scaled_spacing
 
         if icon and alignment is Anchor.RIGHT:
             self.draw_bitmap(bitmap, x, y)
 
-    def putpixel(self, position, color, brightness=1.0):
+    def putpixel(self, position, color, brightness=1.0, scale=None):
         x, y = position
         if (x < 0 or x >= self._window_width) or (
                 y < 0 or y >= self._window_height):
             raise Exception('({}, {}) is out of bounds.'.format(x, y))
 
-        index = y * self._window_width + x
         color = color if brightness == 1.0 else modify_brightness(color, brightness)
-        self._buffer[index] = color
+        scale = scale if scale else self._scale
+
+        for sx in range(scale):
+            for sy in range(scale):
+                index = (y + sy) * self._window_width + (x + sx)
+                self._buffer[index] = color
 
     def render(self):
         for index in range(len(self._buffer)):

@@ -126,11 +126,12 @@ class WeatherPlugin:
         instance.update()
 
     def update(self):
-        current_temp = self._weather['current_observation']['wind']['chill']
-        current_temp_str = '{0:.0f}'.format(current_temp)
+        if self._weather:
+            current_temp = self._weather['current_observation']['wind']['chill']
+            current_temp_str = '{0:.0f}'.format(current_temp)
 
-        self._renderer.draw_string(current_temp_str,
-                                   anchor=Anchor.BOTTOM | Anchor.RIGHT,
-                                   icon=(STORM, Anchor.RIGHT))
+            self._renderer.draw_string(current_temp_str,
+                                       anchor=Anchor.BOTTOM | Anchor.RIGHT,
+                                       icon=(STORM, Anchor.RIGHT))
 
 

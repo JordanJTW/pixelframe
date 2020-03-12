@@ -7,7 +7,7 @@ idna==2.8
 ifaddr==0.1.6
 Pillow==5.3.0
 protobuf==3.6.1
-psutil==5.4.8
+psutil==5.6.6
 PyChromecast==2.3.0
 pyparsing==2.3.1
 python-dateutil==2.7.5
